@@ -1,10 +1,12 @@
 import React, { Component } from 'react';
-import axios from 'axios';
 import { connect } from 'react-redux';
-import { setFormUser, setSubmitting, addUser, updateUser,validateField } from './redux/userSlice'; // Adjust path
+import { setFormUser, setSubmitting, addUser, updateUser } from './redux/userSlice';
+import { Field, reduxForm } from 'redux-form';
 import { TextField, Button, Container, Typography, Box } from '@mui/material';
-import { useParams, useNavigate } from 'react-router-dom'; // Import the useParams and useNavigate hooks
+import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
+// Higher Order Component to handle routing params and navigation
 const withParamsAndNavigate = (Component) => {
   return (props) => {
     const params = useParams();
@@ -14,182 +16,80 @@ const withParamsAndNavigate = (Component) => {
 };
 
 class FormPage extends Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      user: {
-        name: '',
-        phone: '',
-        email: '',
-        marks1: '',
-        marks2: '',
-        marks3: '',
-      },
-    };
-  }
-
   componentDidMount() {
     const { params, dispatch } = this.props;
     const { id } = params;
-
+    
     if (id) {
+      // Fetch user data when editing an existing user
       this.fetchUserData(id);
     }
     dispatch(setSubmitting(false));
   }
 
+  // Fetch user data from API
   fetchUserData = async (id) => {
     try {
       const response = await axios.get(`http://localhost:5000/users/${id}`);
       const fetchedUser = response.data;
-      this.setState({ user: fetchedUser });
-      this.props.dispatch(setFormUser(fetchedUser));
+      console.log('Fetched user:', fetchedUser);
+      this.props.dispatch(setFormUser(fetchedUser));  // Set user data in Redux state
     } catch (error) {
       console.error('Error fetching user data:', error);
     }
   };
 
-  handleChange = (e) => {
-    const { name, value } = e.target;
-
-    // Update local state
-    this.setState((prevState) => ({
-      user: {
-        ...prevState.user,
-        [name]: value,
-      },
-    }));
-
-    // Dispatch actions to update form state and validate the field
-    this.props.dispatch(setFormUser({ [name]: value }));
-
-    // Validate field dynamically as user types
-    this.props.dispatch(validateField({ field: name, value }));
-
-    
-  };
-
-  handleSubmit = async (e) => {
-    e.preventDefault();
-    const { user } = this.state;
+  // Handle form submission
+  handleSubmit = async (formValues) => {
     const { dispatch, navigate } = this.props;
 
     try {
-      if (user.id) {
-        await axios.patch(`http://localhost:5000/users/${user.id}`, user);
-        dispatch(updateUser(user));
+      if (formValues.id) {
+        // Update existing user
+        await axios.patch(`http://localhost:5000/users/${formValues.id}`, formValues);
+        dispatch(updateUser(formValues));  // Update user in Redux
       } else {
-        const response = await axios.post('http://localhost:5000/users', user);
-        dispatch(addUser(response.data));
+        // Add new user
+        const response = await axios.post('http://localhost:5000/users', formValues);
+        dispatch(addUser(response.data));  // Add new user to Redux
       }
-      navigate('/');
+      navigate('/');  // Navigate back to the user list page
     } catch (error) {
       console.error('Error submitting user:', error);
     }
   };
 
+  // Custom render method for TextField
+  renderTextField = ({ input, label, meta: { touched, error } }) => (
+    <Box mb={2}>
+      <TextField
+        {...input}  // Spread the input properties to connect redux-form to the field
+        label={label}
+        variant="outlined"
+        fullWidth
+        error={touched && !!error}
+        helperText={touched && error}
+      />
+    </Box>
+  );
+
   render() {
-    const { user } = this.state;
-    const { errors, isSubmitting } = this.props;
+    const { handleSubmit, isSubmitting } = this.props;
 
     return (
       <Container maxWidth="sm" sx={{ marginTop: 4 }}>
         <Typography variant="h4" align="center" gutterBottom>
-          {this.props.id ? 'Edit User' : 'Create User'}
+          {this.props.params.id ? 'Edit User' : 'Create User'}
         </Typography>
-        <form onSubmit={this.handleSubmit}>
-          {/* Name Input Field */}
-          <Box mb={2}>
-            <TextField
-              fullWidth
-              label="Name"
-              name="name"
-              value={user.name}
-              onChange={this.handleChange}
-              variant="outlined"
-              error={!!errors.name}
-              helperText={errors.name}
-            />
-          </Box>
-
-          {/* Phone Input Field */}
-          <Box mb={2}>
-            <TextField
-              fullWidth
-              label="Phone"
-              name="phone"
-              value={user.phone}
-              onChange={this.handleChange}
-              variant="outlined"
-              error={!!errors.phone}
-              helperText={errors.phone}
-            />
-          </Box>
-
-          {/* Email Input Field */}
-          <Box mb={2}>
-            <TextField
-              fullWidth
-              label="Email"
-              name="email"
-              value={user.email}
-              onChange={this.handleChange}
-              variant="outlined"
-              error={!!errors.email}
-              helperText={errors.email}
-            />
-          </Box>
-
-          {/* Marks 1 Input Field */}
-          <Box mb={2}>
-            <TextField
-              fullWidth
-              label="Marks 1"
-              name="marks1"
-              value={user.marks1}
-              onChange={this.handleChange}
-              variant="outlined"
-              error={!!errors.marks1}
-              helperText={errors.marks1}
-            />
-          </Box>
-
-          {/* Marks 2 Input Field */}
-          <Box mb={2}>
-            <TextField
-              fullWidth
-              label="Marks 2"
-              name="marks2"
-              value={user.marks2}
-              onChange={this.handleChange}
-              variant="outlined"
-              error={!!errors.marks2}
-              helperText={errors.marks2}
-            />
-          </Box>
-
-          {/* Marks 3 Input Field */}
-          <Box mb={2}>
-            <TextField
-              fullWidth
-              label="Marks 3"
-              name="marks3"
-              value={user.marks3}
-              onChange={this.handleChange}
-              variant="outlined"
-              error={!!errors.marks3}
-              helperText={errors.marks3}
-            />
-          </Box>
-
-          {/* Submit Button */}
+        <form onSubmit={handleSubmit(this.handleSubmit)}>
+          <Field name="name" label="Name" component={this.renderTextField} />
+          <Field name="phone" label="Phone" component={this.renderTextField} />
+          <Field name="email" label="Email" component={this.renderTextField} />
+          <Field name="marks1" label="Marks 1" component={this.renderTextField} />
+          <Field name="marks2" label="Marks 2" component={this.renderTextField} />
+          <Field name="marks3" label="Marks 3" component={this.renderTextField} />
           <Box textAlign="center">
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              disabled={isSubmitting}
-            >
+            <Button type="submit" variant="contained" color="primary" disabled={isSubmitting}>
               Submit
             </Button>
           </Box>
@@ -201,8 +101,13 @@ class FormPage extends Component {
 
 const mapStateToProps = (state) => ({
   user: state.users.form.user,
-  errors: state.users.form.errors,
   isSubmitting: state.users.form.isSubmitting,
+  initialValues: state.users.form.user,  // Ensure initial values are from Redux state
 });
 
-export default withParamsAndNavigate(connect(mapStateToProps)(FormPage));
+const formWrapped = reduxForm({
+  form: 'userForm',
+  enableReinitialize: true,  // Ensure re-initialization when form values change
+})(FormPage);
+
+export default withParamsAndNavigate(connect(mapStateToProps)(formWrapped));
